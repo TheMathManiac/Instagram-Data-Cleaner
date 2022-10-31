@@ -1,0 +1,379 @@
+import pandas as pd
+import numpy as np
+import smtplib
+import win32com.client as win32
+from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
+from email.mime.text import MIMEText
+import sqlite3
+from sqlalchemy import create_engine
+from IPython.display import display
+from instabot import Bot
+engine = create_engine('sqlite://', echo=False)
+from nltk.tokenize import sent_tokenize
+from nltk.corpus import stopwords
+from collections import Counter
+import re
+from string import punctuation
+import unicodedata
+from nltk.tokenize import word_tokenize
+from nltk.probability import FreqDist
+from itertools import chain
+from googletrans import Translator, constants
+translator = Translator()
+import seaborn as sns
+import matplotlib.pyplot as plt
+from jupyterthemes import jtplot
+
+#######################################################################################################################################################################
+
+#Here, we obtain CSV file (1)(new_results) from PhantomBuster, which contains all the posts on 
+#instagram associated with our chosen hashtags
+#We then take the top posts (highest comment and like count) and export the associated instagram urls (user profile links) data as a CSV file (username_url) (2) to be used 
+#in PhantomBuster. 
+
+hashtag_data = pd.read_csv('C:/Users/SPNMo/.spyder-py3/new_results.csv', delimiter = ';', skiprows = 0, low_memory = False)
+hashtag_data_frame = pd.DataFrame(hashtag_data)
+    
+hashtag_data_frame_sorted = hashtag_data_frame.loc[:, ['profileUrl', 'username', 'commentCount', 'likeCount']]
+hashtag_data_frame_sorted.dropna(inplace = True)
+pd.set_option("display.max_rows", None)
+display(hashtag_data_frame_sorted.head(6000))
+
+hashtag_data_frame_sorted['commentCount'] = pd.to_numeric(hashtag_data_frame_sorted['commentCount'], errors='coerce')
+hashtag_data_frame_sorted['likeCount'] = pd.to_numeric(hashtag_data_frame_sorted['likeCount'], errors='coerce')
+hashtag_data_frame_sorted['commentCount'] = hashtag_data_frame_sorted['commentCount'].replace(np.nan, 0)
+hashtag_data_frame_sorted['likeCount'] = hashtag_data_frame_sorted['likeCount'].replace(np.nan, 0)
+
+dictionary_list = []
+
+for row in hashtag_data_frame_sorted.itertuples():
+    
+            if int(row.commentCount) > 50 and int(row.likeCount) > 200:
+            
+                dictionary = {'instagram_url': row.profileUrl, 'username': row.username, 'comments': row.commentCount, 'likes': row.likeCount}
+            
+                dictionary_list.append(dictionary)
+            
+most_popular_posts_data_frame = pd.DataFrame.from_dict(dictionary_list)
+most_popular_posts_data_frame = most_popular_posts_data_frame.iloc[:, 0]
+most_popular_posts_data_frame_two = most_popular_posts_data_frame.values.tolist()
+instagram_url_data_frame = pd.DataFrame(most_popular_posts_data_frame)
+instagram_url_data_frame.set_index('instagram_url')
+instagram_url_data_frame.to_csv('username_url.csv')
+pd.set_option("display.max_rows", None)
+display(instagram_url_data_frame.head(500))
+
+#######################################################################################################################################################################
+
+#Database created contains all the relevant information of the biggest instagram accounts (in terms of followers). But from this
+#we want to know which of these accounts have the highest levels of engagement. We export the instagram_urls
+#from this database as a new CSV file (4)(profiles) to be used in PhantomBuster.
+
+
+def CreateDatabase(final_best_username_data_frame):
+    database_best_profiles = final_best_username_data_frame.to_sql(name='instagram_user_info_data_base_new', con=engine, if_exists='append', index=False)
+    database_best_profiles = engine.execute("SELECT * FROM instagram_user_info_data_base_new").fetchall()
+    username_data_frame = pd.DataFrame(database_best_profiles)
+    best_username_data_base = username_data_frame.drop_duplicates(keep='first')
+    best_username_data_base.set_axis(['Username', 'Followers', 'Email', 'Bio', 'Posts', 'Website', 'Profile'], axis='columns', inplace=True)
+    pd.set_option("display.max_rows", None)
+    display(best_username_data_base.head(200))
+    best_username_data_base.to_csv('FullDatabase.csv') #full database CSV file (if we want it)
+    best_username_data_base['Profile'].values.tolist()
+    best_username_data_base_final_profiles = pd.DataFrame(best_username_data_base['Profile'])
+    best_username_data_base_final_profiles.to_csv('profiles')
+    
+    
+    #WordProcessingDatabase(best_username_data_base)
+
+######################################################################################################################################################################
+
+#From the CSV file (2) (username_url) in PhantomBuster, we obtain a new exported CSV file (3) (the_final_one) which gives us information on the 
+#number of followers associated with these instagram_url accounts. From this, we obtain the instagram accounts with the highest
+#number of followers. We then store this information in a database (CreateDatabase)
+
+dictionary_list_two = []
+data_two = pd.read_csv('C:/Users/SPNMo/.spyder-py3/the_final_one.csv', delimiter = ';', skiprows = 0, low_memory = False)
+popular_user_data_frame = pd.DataFrame(data_two)
+pd.set_option("display.max_rows", None)
+#display(popular_user_data_frame.head(100))
+popular_user_data_frame = popular_user_data_frame.loc[:, ['profileName', 'followersCount', 'publicEmail', 'bio', 'postsCount', 'website', 'profileUrl']]
+#print(popular_user_data_frame)
+for row in popular_user_data_frame.itertuples():
+            
+            if int(row.followersCount) > 50000:
+                
+                dictionary = {'Name': row.profileName, 'Followers': row.followersCount, 'Email': row.publicEmail, 'Bio': row.bio, 'Posts': row.postsCount, 'Website': row.website, 'Profile': row.profileUrl}
+
+                dictionary_list_two.append(dictionary)
+
+
+final_best_username_data_frame = pd.DataFrame.from_dict(dictionary_list_two)
+#display(final_best_username_data_frame.head(100))
+CreateDatabase(final_best_username_data_frame)
+
+#SendInstagramMessage(usernames)
+
+#######################################################################################################################################################################
+ 
+ 
+ def WordProcessingDatabase(best_username_data_base):
+    
+    bio_list = best_username_data_base['Bio'].astype(str).values.tolist()
+    
+    first_split = []
+    
+    for i in bio_list:
+        first_split.append(i.split())
+        
+        
+    second_split = []
+    
+    for j in first_split:
+        for k in j:
+            second_split.append(k.split())
+    
+            
+    final_list = []
+    
+    for m in second_split:
+        for n in m:
+            if(n not in final_list):
+                final_list.append(n)
+     
+   
+
+    cleaned_list_one = [s.replace('?', '') for s in final_list]
+    
+    while('' in cleaned_list_one):
+        cleaned_list_one.remove('')
+   
+
+    
+    cleaned_list_two = []
+    
+    for j in cleaned_list_one:
+        cleaned_list_new = re.sub(r'[^a-zA-Z0-9]', '', j)    
+        
+        cleaned_list_two.append(cleaned_list_new)
+    
+    
+    
+    cleaned_list_three = []
+
+    for k in cleaned_list_two:
+        
+        cleaned_list_new_two = re.sub(r'[0-9]+', '', k)   
+        cleaned_list_three.append(cleaned_list_new_two)
+        
+         
+    
+    while('' in cleaned_list_three):
+        cleaned_list_three.remove('')
+        
+    
+    final_word_counts = [i for i in cleaned_list_three if len(i) >= 3]
+    word_counts = Counter(final_word_counts)
+    print(word_counts) 
+  
+#######################################################################################################################################################################
+  
+#From the csv file (4) containing the top instagram_urls (profiles), we import this into PhantomBuster, which will in turn give us
+#a CSV file (5) (best_usernames), which contains all the posts ever made by each of these intagram_url accounts as well as the 
+#corresponding number of likes and comments for each post. This CSV file (5) we import into CalculateEngagementRate. We also 
+#take from CSV file (5) all the username_urls (removing the duplicates) so that we can create a CSV file (6)(ProfileUrl) which will be fed into
+#PhantomBuster giving us an exported CSV file (7) (information containing follower count and emails)
+
+data_posts = pd.read_csv('C:/Users/SPNMo/.spyder-py3/best_usernames.csv', delimiter = ';', skiprows = 0, low_memory = False)
+popular_user_data_frame = pd.DataFrame(data_posts)
+popular_user_data_frame = popular_user_data_frame.loc[:, ['description', 'username', 'commentCount', 'likeCount', 'profileUrl']]
+pd.set_option("display.max_rows", None)
+display(popular_user_data_frame.head(4000))
+
+dictionary_list = []
+for row in popular_user_data_frame.itertuples():
+    
+        dictionary = {'ProfileUrl': row.profileUrl}
+        dictionary_list.append(dictionary)
+        
+
+username_data_frame = pd.DataFrame.from_dict(dictionary_list)
+username_data_frame.drop_duplicates(subset=None, keep='first', inplace=True)    
+username_data_frame.set_index('ProfileUrl')
+username_data_frame.to_csv('ProfileUrl.csv')
+#print(username_data_frame)    
+
+    
+CalculateEngagementRate(popular_user_data_frame)
+#WordProcessingBestPosts(popular_user_data_frame)  
+
+########################################################################################################################################################################
+
+#CSV file (5)(popular_user_data_frame) to calculate row and comment totals (engagement rates) is used alongside CSV file(7)(followers_data_frame) 
+#so that we can get follower counts and email addresses (for CSV file (7) we must remove NAN from followersCount).
+
+def CalculateEngagementRate(popular_user_data_frame):
+    
+        followers_data_frame = pd.read_csv('C:/Users/SPNMo/.spyder-py3/followers.csv',delimiter = ';', skiprows = 0, low_memory = False) 
+        followers_data_frame = followers_data_frame.dropna(subset=['followersCount'])
+        display(followers_data_frame)
+        followers = followers_data_frame['followersCount'].values.tolist()
+        popular_user_data_frame.fillna(0, inplace=True)
+        popular_user_data_frame.drop_duplicates(subset=None, keep='first', inplace=True)
+
+        sum_list = []
+        average_list = []
+        email_list = []
+        username_list = list(dict.fromkeys(popular_user_data_frame['username']))
+        
+        
+        for count in followers:
+            
+            for username in username_list:
+        
+                length = len(popular_user_data_frame[popular_user_data_frame['username'].str.contains(username)])
+                username_data_frame = pd.DataFrame((popular_user_data_frame[popular_user_data_frame['username'].str.contains(username)]))
+            
+            
+            for row in username_data_frame.itertuples():
+                
+                sum_total = row.commentCount + row.likeCount
+                sum_list.append(sum_total)
+                
+                
+            average = (((np.sum(sum_list))/length)/count)*100
+            average_list.append(average)
+        
+            
+        followers_data_frame['EngagementRate'] = average_list
+        followers_data_frame = followers_data_frame.dropna(subset=['mailFound'])
+        display(followers_data_frame.head(100))
+        
+        for row in followers_data_frame.itertuples():
+            
+            if row.EngagementRate >= 3:
+                email_list.append(row.mailFound)
+        
+        #SendEmail(email_list)
+        print(email_list)
+        
+            
+  ######################################################################################################################################################################       
+  
+  def WordProcessingBestPosts(popular_user_data_frame):
+    
+    post_list = popular_user_data_frame['description'].astype(str).values.tolist()
+    first_split = []
+    
+    for i in post_list:
+        first_split.append(i.split())
+        
+        
+    second_split = []
+    
+    for j in first_split:
+        for k in j:
+            second_split.append(k.split())
+    
+            
+    final_list = []
+    
+    for m in second_split:
+        for n in m:
+            if(n not in final_list):
+                final_list.append(n)
+     
+   
+    cleaned_list_one = [s.replace('?', '') for s in final_list]
+    
+    while('' in cleaned_list_one):
+        cleaned_list_one.remove('')
+   
+
+    
+    cleaned_list_two = []
+    
+    for j in cleaned_list_one:
+        cleaned_list_new = re.sub(r'[^a-zA-Z0-9]', '', j)    
+        cleaned_list_two.append(cleaned_list_new)
+    
+    
+    
+    cleaned_list_three = []
+
+    for k in cleaned_list_two:
+        cleaned_list_new_two = re.sub(r'[0-9]+', '', k)   
+        cleaned_list_three.append(cleaned_list_new_two)
+        
+         
+    
+    while('' in cleaned_list_three):
+        cleaned_list_three.remove('')
+    
+        
+    final_word_counts = [i for i in cleaned_list_three if len(i) >= 3]
+    word_counts = Counter(final_word_counts)
+    top_words = word_counts.most_common(100)
+    top_words_data_frame = pd.DataFrame(top_words, columns=['Word', 'Count']).reset_index(drop=True)
+    print(word_counts.most_common(100))
+    print(top_words_data_frame)
+    plt.figure(figsize=(12,4))
+    sns.barplot(data=top_words_data_frame[:10], x='Word', y='Count', alpha=0.8)
+    plt.ylabel('Number Of Occurances', fontsize=12)
+    plt.xlabel('Word', fontsize=12)
+    plt.xticks(rotation=90)
+    plt.show()
+ 
+ ######################################################################################################################################################################
+ 
+ def SendEmail(email_list):
+    msg = MIMEMultipart()
+    msg['Subject'] = 'Our family reunion'
+        addresses = email_frame
+    addresses = email_list
+    me = 'steve@crossborderinfluencer.com'
+    msg['From'] = me
+    msg['To'] = ', '.join(addresses)
+    msg['To'] = ', '.join(addresses).encode()
+  msg['To'] = 'steve@crossborderinfluencer.com'
+  text = MIMEText("Hello")
+  msg.attach(text)
+  attach_file_name = 
+
+  text = """\
+  Hi,
+  How are you?
+  Real Python has many great tutorials:
+  www.realpython.com"""
+
+
+  '''html = """"\
+  <html>
+    <body>
+      <p>Hi,<br>
+         How are you?<br>
+        <a href="http://www.realpython.com">Real Python</a> 
+        has many great tutorials.
+      </p>
+    </body>
+  </html> """'''
+
+  part2 = MIMEText(text, 'plain')
+  part1 = MIMEText(html, 'html')
+  msg.attach(part1)
+  msg.attach(part2)
+
+
+  '''with open(attach_file_name, 'rb') as opened:
+  openedfile = opened.read()
+  attachedfile = MIMEApplication(openedfile, _subtype='pdf')
+  attachedfile.add_header('content-disposition', 'attachment', filename=attach_file_name)
+  msg.attach(attachedfile)'''
+        
+  server = smtplib.SMTP('smtp-mail.outlook.com', 587)
+  server.starttls()
+  server.login("steve@crossborderinfluencer.com", 'AtStephenMoreton123!')
+  server.sendmail(me, me, msg.as_string())
+  print('Email Sent')
+    
