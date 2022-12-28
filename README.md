@@ -1,6 +1,6 @@
 ## What Is The Instagram-Data-Cleaner Project?
 
-* Extract relevant instagram accounts from raw, unfiltered CSV files, add them to an ever-growing database, and import this database into Salesforce
+* Extract relevant instagram accounts from raw, unfiltered CSV files, add them to a dynamic database, and import this database into Salesforce
 
 ## The Goal Of The Project?
 
