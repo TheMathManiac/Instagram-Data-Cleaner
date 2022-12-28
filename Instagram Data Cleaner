@@ -194,12 +194,9 @@ for row in popular_user_data_frame.itertuples():
 username_data_frame = pd.DataFrame.from_dict(dictionary_list)
 username_data_frame.drop_duplicates(subset=None, keep='first', inplace=True)    
 username_data_frame.set_index('ProfileUrl')
-username_data_frame.to_csv('ProfileUrl.csv')
-#print(username_data_frame)    
-
-    
+username_data_frame.to_csv('ProfileUrl.csv')  
 CalculateEngagementRate(popular_user_data_frame)
-#WordProcessingBestPosts(popular_user_data_frame)  
+  
 
 ########################################################################################################################################################################
 
@@ -222,7 +219,6 @@ def CalculateEngagementRate(popular_user_data_frame):
         
         
         for count in followers:
-            
             for username in username_list:
         
                 length = len(popular_user_data_frame[popular_user_data_frame['username'].str.contains(username)])
@@ -230,7 +226,6 @@ def CalculateEngagementRate(popular_user_data_frame):
             
             
             for row in username_data_frame.itertuples():
-                
                 sum_total = row.commentCount + row.likeCount
                 sum_list.append(sum_total)
                 
@@ -238,25 +233,21 @@ def CalculateEngagementRate(popular_user_data_frame):
             average = (((np.sum(sum_list))/length)/count)*100
             average_list.append(average)
         
-            
         followers_data_frame['EngagementRate'] = average_list
         followers_data_frame = followers_data_frame.dropna(subset=['mailFound'])
         display(followers_data_frame.head(100))
         
         for row in followers_data_frame.itertuples():
-            
             if row.EngagementRate >= 3:
                 email_list.append(row.mailFound)
         
-        #SendEmail(email_list)
+        SendEmail(email_list)
         print(email_list)
         
             
   ######################################################################################################################################################################       
   
   
-        
- 
  def SendEmail(email_list):
     msg = MIMEMultipart()
     msg['Subject'] = 'Our family reunion'
