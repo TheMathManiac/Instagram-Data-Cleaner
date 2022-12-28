@@ -83,11 +83,9 @@ def CreateDatabase(final_best_username_data_frame):
     best_username_data_base['Profile'].values.tolist()
     best_username_data_base_final_profiles = pd.DataFrame(best_username_data_base['Profile'])
     best_username_data_base_final_profiles.to_csv('profiles')
-    
-    
-    WordProcessingDatabase(best_username_data_base)
 
 ######################################################################################################################################################################
+
 
 #From the CSV file (2) (username_url) in PhantomBuster, we obtain a new exported CSV file (3) (the_final_one) which gives us information on the 
 #number of followers associated with these instagram_url accounts. From this, we obtain the instagram accounts with the highest
@@ -108,70 +106,11 @@ for row in popular_user_data_frame.itertuples():
 
 final_best_username_data_frame = pd.DataFrame.from_dict(dictionary_list_two)
 CreateDatabase(final_best_username_data_frame)
-
 SendInstagramMessage(usernames)
 
 #######################################################################################################################################################################
  
  
- def WordProcessingDatabase(best_username_data_base):
-    
-    bio_list = best_username_data_base['Bio'].astype(str).values.tolist()
-    first_split = []
-    
-    for i in bio_list:
-        first_split.append(i.split())
-        
-        
-    second_split = []
-    
-    for j in first_split:
-        for k in j:
-            second_split.append(k.split())
-    
-            
-    final_list = []
-    
-    for m in second_split:
-        for n in m:
-            if(n not in final_list):
-                final_list.append(n)
-     
-   
-
-    cleaned_list_one = [s.replace('?', '') for s in final_list]
-    
-    while('' in cleaned_list_one):
-        cleaned_list_one.remove('')
-   
-
-    
-    cleaned_list_two = []
-    
-    for j in cleaned_list_one:
-        cleaned_list_new = re.sub(r'[^a-zA-Z0-9]', '', j)    
-        cleaned_list_two.append(cleaned_list_new)
-    
-    
-    
-    cleaned_list_three = []
-
-    for k in cleaned_list_two:
-        cleaned_list_new_two = re.sub(r'[0-9]+', '', k)   
-        cleaned_list_three.append(cleaned_list_new_two)
-        
-         
-    
-    while('' in cleaned_list_three):
-        cleaned_list_three.remove('')
-        
-    
-    final_word_counts = [i for i in cleaned_list_three if len(i) >= 3]
-    word_counts = Counter(final_word_counts)
-    print(word_counts) 
-  
-#######################################################################################################################################################################
-  
 #From the csv file (4) containing the top instagram_urls (profiles), we import this into PhantomBuster, which will in turn give us
 #a CSV file (5) (best_usernames), which contains all the posts ever made by each of these intagram_url accounts as well as the 
 #corresponding number of likes and comments for each post. This CSV file (5) we import into CalculateEngagementRate. We also 
