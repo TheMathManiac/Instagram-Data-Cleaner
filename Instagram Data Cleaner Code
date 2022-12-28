@@ -181,7 +181,7 @@ def CalculateEngagementRate(popular_user_data_frame):
                 email_list.append(row.mailFound)
         
         SendEmail(email_list)
-        print(email_list)
+        
         
             
   ######################################################################################################################################################################       
